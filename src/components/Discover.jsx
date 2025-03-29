@@ -3,19 +3,30 @@ import { useState, useEffect } from 'react';
 const Discover = () => {
   const [data, setData] = useState(null);
   const [banList, setBanList] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      const response = await fetch("https://api.thecatapi.com/v1/images/search?has_breeds=1");
+      const response = await fetch("https://api.thecatapi.com/v1/images/search?has_breeds=1", {
+        headers: {
+          "x-api-key": import.meta.env.VITE_CAT_API_KEY, // Use environment variable
+        },
+      });
       const json = await response.json();
+      console.log(json); // Debugging: Check the API response structure
       const catData = json[0];
 
-      // Attributes to check against the ban list
+      if (!catData || !catData.breeds || catData.breeds.length === 0) {
+        console.warn("No breeds data found in the API response.");
+        setData(null);
+        return;
+      }
+
       const breed = catData.breeds[0].name;
       const origin = catData.breeds[0].origin;
       const temperament = catData.breeds[0].temperament;
 
-      // If the fetched data has any banned attribute, fetch again
       if (banList.includes(breed) || banList.includes(origin) || banList.includes(temperament)) {
         return fetchData();
       }
@@ -23,6 +34,8 @@ const Discover = () => {
       setData(catData);
     } catch (error) {
       console.error("API fetch error:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -31,52 +44,57 @@ const Discover = () => {
   }, [banList]);
 
   const handleBanList = (attribute) => {
-    setBanList((prevBanList) => {
-      if (prevBanList.includes(attribute)) {
-        // Remove if already in banList
-        return prevBanList.filter((item) => item !== attribute);
-      } else {
-        // Add if not already in banList
-        return [...prevBanList, attribute];
-      }
-    });
+    setBanList((prevBanList) =>
+      prevBanList.includes(attribute)
+        ? prevBanList.filter((item) => item !== attribute)
+        : [...prevBanList, attribute]
+    );
+  };
+
+  const styles = {
+    banItem: {
+      display: 'inline-block',
+      backgroundColor: '#ffcccc',
+      padding: '4px',
+      margin: '2px',
+      cursor: 'pointer',
+      borderRadius: '4px',
+    },
+    clickableText: {
+      cursor: 'pointer',
+    },
   };
 
   return (
     <div>
-      <button onClick={fetchData}>Discover New Item</button>
+      <button onClick={fetchData} aria-label="Discover a new item">
+        {loading ? 'Loading...' : 'Discover New Item'}
+      </button>
 
-      {data && data.breeds && (
+      {data && data.breeds ? (
         <div>
           <img src={data.url} alt="Random item" width={300} />
-
-          <p onClick={() => handleBanList(data.breeds[0].name)} style={{ cursor: 'pointer' }}>
+          <p onClick={() => handleBanList(data.breeds[0].name)} style={styles.clickableText}>
             Breed: {data.breeds[0].name}
           </p>
-          <p onClick={() => handleBanList(data.breeds[0].origin)} style={{ cursor: 'pointer' }}>
+          <p onClick={() => handleBanList(data.breeds[0].origin)} style={styles.clickableText}>
             Origin: {data.breeds[0].origin}
           </p>
-          <p onClick={() => handleBanList(data.breeds[0].temperament)} style={{ cursor: 'pointer' }}>
+          <p onClick={() => handleBanList(data.breeds[0].temperament)} style={styles.clickableText}>
             Temperament: {data.breeds[0].temperament}
           </p>
         </div>
+      ) : (
+        <p>No data available. Try again.</p>
       )}
 
-      {/* Ban List Display */}
       <div>
         <h3>Ban List (click to remove):</h3>
         {banList.map((item) => (
           <span
             key={item}
             onClick={() => handleBanList(item)}
-            style={{
-              display: 'inline-block',
-              backgroundColor: '#ffcccc',
-              padding: '4px',
-              margin: '2px',
-              cursor: 'pointer',
-              borderRadius: '4px',
-            }}
+            style={styles.banItem}
           >
             {item}
           </span>
